@@ -4,7 +4,7 @@
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 import copy
 import string
-
+import multiprocessing
 
 class Box:
 
@@ -102,6 +102,8 @@ class Board:
             del nodeToChange.edges[edge]
             del node2.edges[1]
 
+        #TODO add check for when box is taken
+
 
 
         #self.Board = copy.deepcopy(boardToCopy)
@@ -176,13 +178,149 @@ class Node:
 
     def __init__(self,board,type):
         self.board=board
-        self.type=type
+        self.minOrMax=type
         self.children = {}
+
+        #calulate util
+        self.util = 0
+        for box in board.boxes:
+            self.util+= board.boxes[box].wonByMe
+
+    def generateChildren(self):
+        # to number children
+        i = 0
+        # use a copy of the board to stop dupicate moves
+        rootBoardCopy = copy.deepcopy(self.board)
+
+        for box in rootBoardCopy.boxes:
+            # for each edge generate a new board with that edge removed
+            # and create a new node to add too roots children
+            while len(rootBoardCopy.boxes[box].edges) != 0:
+                # remove the edge from the copy board to stop dupicate edges
+                edge = list(rootBoardCopy.boxes[box].edges.keys())[0]
+                newBoard = copy.deepcopy(self.board)
+                newBoard.changeEdge(newBoard.boxes[box], edge)
+                # remove the edge from the copy board to stop dupicate edges
+                rootBoardCopy.changeEdge(rootBoardCopy.boxes[box], edge)
+
+                #TODO need to change later based on multiple moves
+                if self.minOrMax =="min":
+                    self.children[i] = Node(newBoard, "max")
+                else:
+                    self.children[i] = Node(newBoard, "min")
+                #TODO also NEED TO ADD ultil calulation for boxes
+                i += 1
+
 
 
 class Solver:
-    def __init__(self):
+    def __init__(self, moveNode, moveEdge):
         self.root = Node(Board(),"max")
+        # if going 2nd
+        if moveNode != -1:
+            self.root.board.changeEdge(moveNode,moveEdge)
+
+    def initlise(self):
+        #generate boards to pass to threads
+        #IDEA: each thread gets a copy of main and the frist possable moves
+        #it then gets a range of first moves to check with A B pruning
+
+        #generate all first moves possable
+        self.root.generateChildren()
+
+        #number of cores
+        numOfCores = multiprocessing.cpu_count()
+        #calulate ranges
+        rangeEachThreadFloat = (len(self.root.children)-1)/numOfCores
+        #truncate to int
+        rangeEachThread = int(rangeEachThreadFloat)
+
+
+
+        # if less moves than threads
+        if rangeEachThread ==0 :
+            rangeEachThread=1
+
+        startingNode =0
+        needLastThread = True
+
+        while (startingNode + rangeEachThread < len(self.root.children)):
+            #create threads with range startingNode : startingNode+rangeEachThread
+            startingNode+=rangeEachThread
+            # if no more moves break early
+
+
+        #make last thread range correct
+        if needLastThread:
+            lastRange =  (len(self.root.children)-1)-startingNode
+            print(lastRange)
+            # make last thread
+
+
+        #Wait for caluations
+
+
+        #find best move based on return
+
+
+        #return best move
+
+
+
+
+    def threadWorker(self,start,end):
+        #delete children outside of range
+        children = {}
+        for x in range(start,end+1):
+            children[x]=self.root.children[x]
+        self.root.children = children
+
+        # start iterative deepening search
+
+
+
+
+
+
+        print()
+
+    def iterativeDeepening(self):
+        depth=0
+        while True:
+            result = self.alphaBeta(self.root, depth, -int('inf'), int('inf'))
+            #TODO time limit
+            if result[1] == False:
+                break
+            depth+=1
+
+    #returns 3 things uValue(of child),moreToGet(bool)
+    def alphaBeta(self,root,depth, alpha, beta):
+
+        # if no more children
+        if len(root.children)==0:
+            return root.util, False
+        if depth ==0:
+            return root.util,True
+
+        if self.root.minOrMax == "max":
+            uValue = -int('inf')
+            # only calulate on nodes between start,end (incluesive)
+            for x in root.children:
+                result = self.alphaBeta(self.root.children[x],depth-1,alpha,beta)
+                uValue = max(uValue, result[0])
+                if uValue > beta:
+                    break
+                alpha=max(alpha,uValue)
+            return uValue,result[1]
+        else:
+            uValue = int('inf')
+            for x in root.children:
+                result = self.alphaBeta(self.root.children[x], depth - 1, alpha, beta)
+                uValue = min(uValue, result[0])
+                if uValue < alpha:
+                    break
+                beta = min(beta, uValue)
+            return uValue, result[1]
 
     # when only root node exists
     def aStarInital(self):
@@ -197,7 +335,7 @@ class Solver:
 
         for box in rootBoardCopy.boxes:
             # for each edge generate a new board with that edge removed
-            # and create a new node to add to roots children
+            # and create a new node to add too roots children
             while len(rootBoardCopy.boxes[box].edges) != 0:
                 # remove the edge from the copy board to stop dupicate edges
                 edge = list(rootBoardCopy.boxes[box].edges.keys())[0]
@@ -259,7 +397,7 @@ if __name__ == '__main__':
     test.changeEdge(test.boxes[80], 3)
     test.printBoard()
 
-    sol =Solver()
-    sol.aStarInital()
+    sol =Solver(-1,-1)
+    sol.initlise()
     sol.printRoot()
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
